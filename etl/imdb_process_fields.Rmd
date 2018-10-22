@@ -1,0 +1,143 @@
+---
+title: "imdb process fields"
+output: html_notebook
+---
+
+```{r, warning=FALSE, message=FALSE}
+library(dplyr)
+library(readr)
+library(tidyr)
+```
+
+Reading the separated data file:
+
+```{r}
+imdb_sep <- read_tsv("../data/imdb_data_separated.txt", col_names = FALSE, col_types = list(col_character(), col_character(), col_character(), col_character()))
+names(imdb_sep) <- c("IMDB_ID", "field_type", "field_id", "field_name")
+imdb_sep
+```
+
+
+
+```{r}
+imdb_sep$field_type %>% unique()
+```
+
+Num_roles\tName\tCast_id\tMovie_id_list\n
+credits-by-name.txt
+```{r, eval=FALSE}
+imdb_sep %>% 
+  filter(field_type == "cast") %>% 
+  group_by(field_id, field_name) %>% 
+  summarise(num_roles = n(), movie_ids = paste(IMDB_ID %>% unique(), collapse = ", ")) %>% 
+  ungroup() %>% 
+  select(cast_id = field_id, cast_name = field_name, num_roles, movie_ids) %>% 
+  write_tsv("../data/intermediate/imdb-credits-by-name.tsv", col_names = TRUE)
+```
+
+Reading tsv
+
+```{r, echo=FALSE}
+imdb_tsv <- read_tsv("../data/imdb.tsv")
+imdb_tsv
+```
+
+# For each actor, compute the number of times
+# they appeared in a movie with each genre (by adding up
+# the movie_genres[] rows for each movie they are listed
+# as appearing in).
+# Third pass: For each movie, accumulate the individual
+# actor-genre affinity scores for every actor credited
+# as appearing in that movie (provided that the
+# actor-genre affinity score exceeds the threshold)
+
+```{r}
+duplicate_cast <- imdb_sep %>% 
+  filter(field_type == "cast") %>% 
+  select(field_id, field_name) %>% 
+  unique() %>% 
+  group_by(field_id) %>% 
+  summarise(count = n()) %>% 
+  ungroup() %>% 
+  filter(count == 2) %>% 
+  .$field_id
+
+imdb_cast_movie_genre <- imdb_tsv %>% 
+  select(IMDB_ID, `Sci-Fi`:Biography) %>% 
+  right_join(imdb_sep %>% filter(field_type == "cast", !field_id %in% duplicate_cast)) 
+
+imdb_actor_genre_affinity <- imdb_cast_movie_genre %>% 
+  select(`Sci-Fi`:Biography, field_id, field_name) %>% 
+  gather(genre, genre_score, `Sci-Fi`:Biography) %>% 
+  group_by(field_name, field_id, genre) %>% 
+  summarise(genre_affinity = sum(genre_score)) %>% 
+  ungroup() %>% 
+  filter(genre_affinity > 10) %>% 
+  spread(genre, genre_affinity)
+
+imdb_actor_genre_affinity
+```
+
+Lets create movie genre affinity score
+
+```{r}
+movie_genre_affinity_score <- imdb_sep %>% 
+  filter(field_type == "cast") %>% 
+  inner_join(imdb_actor_genre_affinity) %>% 
+  select(IMDB_ID, Action:Western) %>% 
+  group_by(IMDB_ID) %>% 
+  summarise_all(.funs = funs("sum")) 
+
+movie_genre_affinity_score[is.na(movie_genre_affinity_score)] <- 0
+
+movie_genre_affinity_score %>% 
+  write_tsv("../data/imdb-movie-cast-scores.tsv")
+```
+
+------------------
+
+We can now create affinity scores for all fields:
+
+```{r}
+fields <- c("directors", "production_companies", "cast", "writer", "producer", "composer", "miscellaneous_crew", "distributors", "editor", "cinematographer", "production_designer")
+
+for (f in fields) {
+  print(f)
+  duplicate_directors <- imdb_sep %>% 
+  filter(field_type == f) %>% 
+  select(field_id, field_name) %>% 
+  unique() %>% 
+  group_by(field_id) %>% 
+  summarise(count = n()) %>% 
+  ungroup() %>% 
+  filter(count == 2) %>% 
+  .$field_id
+
+  imdb_directors_movie_genre <- imdb_tsv %>% 
+  select(IMDB_ID, `Sci-Fi`:Biography) %>% 
+  right_join(imdb_sep %>% filter(field_type == f, !field_id %in% duplicate_directors)) 
+
+  imdb_directors_genre_affinity <- imdb_directors_movie_genre %>% 
+  select(`Sci-Fi`:Biography, field_id, field_name) %>% 
+  gather(genre, genre_score, `Sci-Fi`:Biography) %>% 
+  group_by(field_name, field_id, genre) %>% 
+  summarise(genre_affinity = sum(genre_score)) %>% 
+  ungroup() %>% 
+  filter(genre_affinity > 10) %>% 
+  spread(genre, genre_affinity)
+  
+  movie_genre_affinity_score <- imdb_sep %>% 
+  filter(field_type == f) %>% 
+  inner_join(imdb_directors_genre_affinity) %>% 
+  select(IMDB_ID, Action:War) %>% 
+  group_by(IMDB_ID) %>% 
+  summarise_all(.funs = funs("sum")) 
+
+  movie_genre_affinity_score[is.na(movie_genre_affinity_score)] <- 0
+
+  movie_genre_affinity_score %>% 
+  write_tsv(paste0("../data/imdb-movie-", f, "-scores.tsv"))
+  print(f)
+}
+```
+

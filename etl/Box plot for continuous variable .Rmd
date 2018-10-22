@@ -1,0 +1,166 @@
+---
+title: "visualization for each feature"
+author: "Liangliang Zhang"
+date: "April 10, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(ggplot2)
+library(scales)
+```
+
+
+```{r}
+tmdb <- read.delim('tmdb.tsv')
+```
+
+
+### budget
+```{r}
+png('Boxplot for "budget".png', 1000, 1000, res=160)
+# isolate data
+tmdb_budget <- data.frame(budget = tmdb[,5], tmdb[,12:25])
+colnames(tmdb_budget) <- sub('genre_', '', colnames(tmdb_budget))
+
+#reshape data
+tmdb_budget_melt <- melt(tmdb_budget, id.vars = "budget") 
+
+#plot
+ggplot(tmdb_budget_melt, aes(x = factor(variable),  y= log(budget), fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'log Budget') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```
+
+### popularity
+```{r}
+png('Boxplot for "popularity".png', 1000, 1000, res=160)
+# isolate data
+tmdb_popularity <- data.frame(popularity = tmdb[,7], tmdb[,12:25])
+colnames(tmdb_popularity) <- sub('genre_', '', colnames(tmdb_popularity))
+
+#reshape data
+tmdb_popularity_melt <- melt(tmdb_popularity, id.vars = "popularity") 
+
+#plot
+ggplot(tmdb_popularity_melt, aes(x = factor(variable),  y = log(popularity), fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'log popularity') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```
+
+### vote_average
+```{r}
+png('Boxplot for "vote_average".png', 1000, 1000, res=160)
+# isolate data
+tmdb_voteaverage <- data.frame(vote_average = tmdb[,8], tmdb[,12:25])
+colnames(tmdb_voteaverage) <- sub('genre_', '', colnames(tmdb_voteaverage))
+
+#reshape data
+tmdb_voteaverage_melt <- melt(tmdb_voteaverage, id.vars = "vote_average") 
+
+#plot
+ggplot(tmdb_voteaverage_melt, aes(x = factor(variable),  y= vote_average, fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'vote_average') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```
+
+
+### vote_count
+```{r}
+png('Boxplot for "vote_count".png', 1000, 1000, res=160)
+# isolate data
+tmdb_votecount <- data.frame(vote_count = tmdb[,9], tmdb[,12:25])
+colnames(tmdb_votecount) <- sub('genre_', '', colnames(tmdb_votecount))
+
+#reshape data
+tmdb_votecount_melt <- melt(tmdb_votecount, id.vars = "vote_count") 
+
+#plot
+ggplot(tmdb_votecount_melt, aes(x = factor(variable),  y= log(vote_count, base= 10), fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'log vote_count') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```
+
+
+### runtime
+```{r}
+png('Boxplot for "runtime".png', 1000, 1000, res=160)
+# isolate data
+tmdb_runtime <- data.frame(runtime = tmdb[,10], tmdb[,12:25])
+# remove movies with runtime = None
+tmdb_runtime_removeNone <- tmdb_runtime[!tmdb_runtime$runtime=='None', ]
+colnames(tmdb_runtime_removeNone) <- sub('genre_', '', colnames(tmdb_runtime_removeNone))
+
+#reshape data
+tmdb_runtime_melt <- melt(tmdb_runtime_removeNone, id.vars = "runtime") 
+
+#plot
+ggplot(tmdb_runtime_melt, aes(x = factor(variable),  y = as.numeric(runtime), fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'runtime') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```
+
+
+
+
+### revenue
+```{r}
+png('Boxplot for "revenue".png', 1000, 1000, res=160)
+# isolate data
+tmdb_revenue <- data.frame(revenue = tmdb[,11], tmdb[,12:25])
+colnames(tmdb_revenue) <- sub('genre_', '', colnames(tmdb_revenue))
+
+#reshape data
+tmdb_revenue_melt <- melt(tmdb_revenue, id.vars = "revenue") 
+
+#plot
+ggplot(tmdb_revenue_melt, aes(x = factor(variable),  y= log(revenue), fill=factor(value)))+
+  geom_boxplot(position=position_dodge(width=.50),  width = 0.5)+
+  theme(axis.text.x=element_text(angle=60, hjust = 0.4, vjust = 0.6)) +
+  labs(title = "",
+       x = '',
+       y = 'log revenue') +
+  scale_fill_discrete(name="",
+                      breaks=c("0", "1"),
+                      labels=c("out-of-genre", "in-genre"))
+graphics.off()
+```

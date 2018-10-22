@@ -1,0 +1,51 @@
+---
+title: "Untitled"
+author: "Liangliang Zhang"
+date: "April 12, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+genre_names <- colnames(train)[14:33]
+genre_names <- sub('genre_', '', genre_name)
+features_names <- c('Intercept','year','month', 'day','budget','popularity','vote_average','vote_count','runtime',
+                    'revenue', 'rating_imdb', 'votes_imdb')
+p_sig_glm <- data.frame(matrix(NA, length(features_names), length(genre_names), 
+                                 dimnames = list(features_names, genre_names)))
+p_glm <- data.frame(matrix(NA, length(features_names), length(genre_names), 
+                                 dimnames = list(features_names, genre_names)))
+
+for (name in genre_names)
+{
+  #cat('\nGLM model for', name, ':\n')
+  model.glm <- glm(get(paste('genre_', name, sep="")) ~ as.numeric(year) + as.numeric(month) +
+                     as.numeric(day) + budget + popularity +
+                     vote_average + vote_count + as.numeric(runtime) + revenue + 
+                     rating_imdb + votes_imdb, #+kind_imdb
+                   data=train,
+                   family = binomial(link="logit"))
+  predict_glm <- predict(model.glm, newdata=test, type='response') > .5
+  #print (table(prediction=predict_glm, 
+        #ground.truth=test[[paste('genre_', name, sep="")]]))
+  #cat ('Overral prediction accuracy: ', mean(predict_glm == test[[paste('genre_', name, sep="")]], na.rm=TRUE), '\n')
+  p_coefficients <- summary(model.glm)$coefficients[,4]
+  sig_figures <- p_coefficients < 0.05
+  #cat('Featuers with significant coefficients:\n',features_names[sig_figures[1:12]],'\n')
+  p_glm[[name]] <- p_coefficients
+  p_sig_glm[[name]] <- ifelse(p_coefficients<0.05, 1,0)
+  #print(summary(model.glm))
+}
+``` 
+
+
+```{r}
+write.table(p_sig_glm, file='p_significance_glm.tsv', quote=FALSE, sep='\t')
+```
+
+```{r}
+write.table(p_glm, file='p_values_glm.tsv', quote=FALSE, sep='\t')
+```

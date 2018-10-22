@@ -1,0 +1,215 @@
+---
+title: "Template code for locating merged tsvs"
+output: html_notebook
+---
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+library(dplyr)
+library(tidyr)
+```
+
+
+Data load and merge  R:
+
+Load and wrangle TMDB data
+
+```{r, message=FALSE, warning=FALSE}
+# load tmdb train and test set for this week
+tmdb_train <- read_tsv("../data/tmdb.tsv")
+tmdb_test <- read_tsv("../data/tmdb-test.tsv")
+
+# fixing train and test data
+tmdb_train <- tmdb_train %>% 
+  mutate(runtime = as.integer(runtime)) %>% 
+  filter(!is.na(imdb_id), !is.na(release_date)) %>%
+  separate(col = release_date, into = c("year", "month", "day")) %>% 
+  mutate(revenue = ifelse(revenue < 0 | is.na(revenue), 0, revenue),
+         runtime = as.numeric(runtime),
+         year = as.numeric(year),
+         month = as.numeric(month),
+         day = as.numeric(day))
+
+tmdb_test <- tmdb_test %>% 
+  mutate(runtime = as.integer(runtime)) %>% 
+  filter(!is.na(imdb_id), !is.na(release_date)) %>% 
+  separate(col = release_date, into = c("year", "month", "day")) %>% 
+  mutate(revenue = ifelse(revenue < 0 | is.na(revenue), 0, revenue),
+         runtime = as.numeric(runtime),
+         year = as.numeric(year),
+         month = as.numeric(month),
+         day = as.numeric(day))
+```
+
+Load and clean IMDB data
+
+```{r, warning=FALSE, message=FALSE}
+# load imdb train and test set for this week
+imdb_train <- read_tsv("../data/imdb.tsv")
+imdb_test <- read_tsv("../data/imdb-test.tsv")
+
+# fixing column name
+imdb_train <- imdb_train %>% 
+  select(imdb_id = IMDB_ID, rating:Biography) %>% 
+  select(-runtimes) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id)) 
+imdb_train[is.na(imdb_train)] <- 0
+col.names <- names(imdb_train)
+names(imdb_train) <- paste(col.names, "_imdb", sep = "")
+
+imdb_test <- imdb_test %>% 
+  select(imdb_id = IMDB_ID, rating:Biography) %>% 
+  select(-runtimes) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id)) 
+imdb_test[is.na(imdb_test)] <- 0
+col.names <- names(imdb_test)
+names(imdb_test) <- paste(col.names, "_imdb", sep = "")
+```
+
+Load director and cast affinity score
+
+```{r, message=FALSE, warning=FALSE}
+# load tmdb movie director score
+tmdb_movie_director_score_train <- read_tsv("../data/movie-director-scores.tsv")
+col.names <- names(tmdb_movie_director_score_train)
+names(tmdb_movie_director_score_train) <- paste(col.names, "_tmdb_director", sep = "")
+
+tmdb_movie_director_score_test <- read_tsv("../data/movie-director-scores-test.tsv")
+col.names <- names(tmdb_movie_director_score_test)
+names(tmdb_movie_director_score_test) <- paste(col.names, "_tmdb_director", sep = "")
+
+# load tmdb movie cast score
+tmdb_movie_cast_score_train <- read_tsv("../data/movie-cast-scores.tsv")
+col.names <- names(tmdb_movie_cast_score_train)
+names(tmdb_movie_cast_score_train) <- paste(col.names, "_tmdb_cast", sep = "")
+
+tmdb_movie_cast_score_test <- read_tsv("../data/movie-cast-scores-test.tsv")
+col.names <- names(tmdb_movie_cast_score_test)
+names(tmdb_movie_cast_score_test) <- paste(col.names, "_tmdb_cast", sep = "")
+
+# load imdb movie director score
+imdb_movie_director_score_train <- read_tsv("../data/imdb-movie-director-scores.tsv")
+imdb_movie_director_score_train <- imdb_movie_director_score_train %>% 
+  select(imdb_id = IMDB_ID, Action:Western) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id))
+col.names <- names(imdb_movie_director_score_train)
+names(imdb_movie_director_score_train) <- paste("score_genre_", col.names, "_imdb_director", sep = "")
+
+
+imdb_movie_director_score_test <- read_tsv("../data/imdb-movie-director-scores-test.tsv")
+imdb_movie_director_score_test <- imdb_movie_director_score_test %>% 
+  select(imdb_id = IMDB_ID, Action:Western) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id))
+col.names <- names(imdb_movie_director_score_test)
+names(imdb_movie_director_score_test) <- paste("score_genre_", col.names, "_imdb_director", sep = "")
+
+# load imdb movie cast score
+imdb_movie_cast_score_train <- read_tsv("../data/imdb-movie-cast-scores.tsv")
+imdb_movie_cast_score_train <- imdb_movie_cast_score_train %>% 
+  select(imdb_id = IMDB_ID, Action:Western) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id))
+col.names <- names(imdb_movie_cast_score_train)
+names(imdb_movie_cast_score_train) <- paste("score_genre_", col.names, "_imdb_cast", sep = "")
+
+imdb_movie_cast_score_test <- read_tsv("../data/imdb-movie-cast-scores-test.tsv")
+imdb_movie_cast_score_test <- imdb_movie_cast_score_test %>% 
+  select(imdb_id = IMDB_ID, Action:Western) %>% 
+  mutate(imdb_id = paste0("tt", imdb_id))
+col.names <- names(imdb_movie_cast_score_test)
+names(imdb_movie_cast_score_test) <- paste("score_genre_", col.names, "_imdb_cast", sep = "")
+```
+
+Merge these dataset and make train and test set:
+
+```{r}
+# trainset just based on tmdb
+#train <- tmdb_train %>% 
+#  left_join(tmdb_movie_director_score_train, by = c("tmdb_id" = "tmdb_id_tmdb_director")) %>% 
+#  left_join(tmdb_movie_cast_score_train, by = c("tmdb_id" = "tmdb_id_tmdb_cast"))
+
+# tesset based on tmdb:
+#test <- tmdb_test %>% 
+#  inner_join(tmdb_movie_director_score_test, by = c("tmdb_id" = "tmdb_id_tmdb_director")) %>% 
+#  inner_join(tmdb_movie_cast_score_test, by = c("tmdb_id" = "tmdb_id_tmdb_cast"))
+
+
+# trainset based on tmdb and imdb data, (2 sets of labels)
+train <- tmdb_train %>%
+  left_join(tmdb_movie_director_score_train, by = c("tmdb_id" = "tmdb_id_tmdb_director")) %>% 
+  left_join(tmdb_movie_cast_score_train, by = c("tmdb_id" = "tmdb_id_tmdb_cast")) %>% 
+  left_join(imdb_train, by = c("imdb_id" = "imdb_id_imdb")) %>% 
+  left_join(imdb_movie_director_score_train, by = c("imdb_id" = "score_genre_imdb_id_imdb_director")) %>% 
+  left_join(imdb_movie_cast_score_train, by = c("imdb_id" = "score_genre_imdb_id_imdb_cast")) 
+
+# testset just based on tmdb and imdb data, (2 sets of labels)
+test <- tmdb_test %>% 
+  left_join(tmdb_movie_director_score_test, by = c("tmdb_id" = "tmdb_id_tmdb_director")) %>% 
+  left_join(tmdb_movie_cast_score_test, by = c("tmdb_id" = "tmdb_id_tmdb_cast")) %>% 
+  left_join(imdb_test, by = c("imdb_id" = "imdb_id_imdb")) %>% 
+  left_join(imdb_movie_director_score_test, by = c("imdb_id" = "score_genre_imdb_id_imdb_director")) %>% 
+  left_join(imdb_movie_cast_score_test, by = c("imdb_id" = "score_genre_imdb_id_imdb_cast")) 
+
+```
+
+Make a simple model:
+
+```{r}
+model.Action <- glm(genre_Action ~ budget + score_genre_Action_tmdb_director + popularity + year_imdb, data=train,
+                    family = binomial(link="logit"))
+table(prediction=(predict(model.Action, newdata=test, type='response') > .5), 
+      ground.truth=test$genre_Action)
+```
+  
+
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
+  
