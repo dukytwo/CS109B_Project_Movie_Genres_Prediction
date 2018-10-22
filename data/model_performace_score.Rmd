@@ -1,0 +1,224 @@
+---
+title: "Untitled"
+author: "Liangliang Zhang"
+date: "April 16, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(data.table)
+library(ggplot2)
+library(gridExtra)
+```
+
+```{r}
+#Load data
+model_performance <- read.delim('model_@_performance.tsv')
+```
+
+## perfromance for each model 
+### train
+```{r}
+# accuracy
+model_performance$train.accuracy <- (model_performance$Train_TruePos + model_performance$Train_TrueNeg)/
+  (model_performance$Train_TruePos + model_performance$Train_FalseNeg + model_performance$Train_TrueNeg + 
+     model_performance$Train_FalsePos)
+
+# sensitivity
+model_performance$train.sensitivity <- model_performance$Train_TruePos/
+  (model_performance$Train_TruePos + model_performance$Train_FalseNeg)
+    
+# specificity
+model_performance$train.specificity <- model_performance$Train_TrueNeg/
+  (model_performance$Train_FalsePos + model_performance$Train_TrueNeg)
+    
+# precision
+model_performance$train.precision <- model_performance$Train_TruePos/
+  (model_performance$Train_TruePos + model_performance$Train_FalsePos)
+
+# fscore:harmonic mean between precision and recall
+model_performance$train.fscore <- 2 * model_performance$Train_TruePos /
+  (2* model_performance$Train_TruePos + model_performance$Train_FalsePos + model_performance$Train_FalseNeg)
+```
+
+###Test
+```{r}
+# accuracy
+model_performance$test.accuracy <- (model_performance$Test_TruePos + model_performance$Test_TrueNeg)/
+  (model_performance$Test_TruePos + model_performance$Test_FalseNeg + model_performance$Test_TrueNeg + 
+     model_performance$Test_FalsePos)
+
+# sensitivity
+model_performance$test.sensitivity <- model_performance$Test_TruePos/
+  (model_performance$Test_TruePos + model_performance$Test_FalseNeg)
+    
+# specificity
+model_performance$test.specificity <- model_performance$Test_TrueNeg/
+  (model_performance$Test_FalsePos + model_performance$Test_TrueNeg)
+    
+# precision
+model_performance$test.precision <- model_performance$Test_TruePos/
+  (model_performance$Test_TruePos + model_performance$Test_FalsePos)
+
+# fscore:harmonic mean between precision and recall
+model_performance$test.fscore <- 2 * model_performance$Test_TruePos /
+  (2* model_performance$Test_TruePos + model_performance$Test_FalsePos + model_performance$Test_FalseNeg)
+```
+
+```{r}
+write.table(model_performance, file='model_performance_each_model.tsv', quote=FALSE, sep='\t', col.names = T, 
+            row.names=FALSE)
+```
+
+
+## assembled model 
+### pick the model with best f score for each genre
+```{r}
+# find model with highest f score for each genre
+max_fscore = as.data.frame(as.data.table(model_performance)[, .SD[which.max(train.fscore)], by=Genre])
+```
+
+
+```{r}
+#Confusion Matrix
+confusion_matrix_max_fscore_test <- data.frame(prediction_1 = c(sum(max_fscore$Test_TruePos),
+                                                                sum(max_fscore$Test_FalsePos)),
+                                               prediction_0 = c(sum(max_fscore$Test_FalseNeg),
+                                                                sum(max_fscore$Test_TrueNeg)),
+                                               row.names = c('true_1', 'true_0')) 
+# write to file
+write.table(confusion_matrix_max_fscore_test, file = "confusion_matrix_max_fscore_test.csv", sep = ",", 
+            col.names = NA, qmethod = "double")
+
+# create tabel image for presentation
+#png("confusion_matrix_max_fscore_test.png",500, 250, res=160)
+p<-tableGrob(confusion_matrix_max_fscore_test)
+grid.arrange(p)
+#dev.off()
+```
+
+```{r}
+#hamming loss
+hamming_loss_test_fscore_model <- (sum(max_fscore$Test_FalsePos) + sum(max_fscore$Test_FalseNeg))/
+  (sum(max_fscore$Test_TruePos) + sum(max_fscore$Test_FalseNeg) + sum(max_fscore$Test_TrueNeg) +
+     sum(max_fscore$Test_FalsePos))
+
+#f score
+fscore_test_fscore_model <- 2 * sum(max_fscore$Test_TruePos) /
+  (2* sum(max_fscore$Test_TruePos) + sum(max_fscore$Test_FalsePos) + sum(max_fscore$Test_FalseNeg))
+
+# sensitivity
+sensitivity_test_fscore_model <- sum(max_fscore$Test_TruePos)/(sum(max_fscore$Test_TruePos) +
+                                                                 sum(max_fscore$Test_FalseNeg))
+
+# specificity
+specificity_test_fscore_model <- sum(max_fscore$Test_TrueNeg)/(sum(max_fscore$Test_FalsePos) +
+                                                                 sum(max_fscore$Test_TrueNeg))
+```
+
+```{r}
+write.table(max_fscore, file='assembled_model_max_fscore.tsv', quote=FALSE, sep='\t', col.names = T, row.names=FALSE)
+
+model_performance_assembled_fscore <- data.frame(hamming_loss_test_fscore_model, 
+                                                 fscore_test_fscore_model,
+                                                 sensitivity_test_fscore_model, 
+                                                 specificity_test_fscore_model)
+write.table(model_performance_assembled_fscore, file='model_performance_assembled_fscore.tsv', 
+            quote=FALSE, sep='\t', col.names = T, row.names=FALSE)
+```
+
+```{r}
+# plot fscore for each selected model
+#png("fscore_each_gennre_fscore_model.png", 1200, 800, res=160)
+ggplot(data = max_fscore, aes(x = Genre, y = test.fscore)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#dev.off()
+```
+
+```{r}
+# plot accuracy for each selected model
+#png("accuracy_each_gennre_fscore_model.png", 1200, 800, res=160)
+ggplot(data = max_fscore, aes(x = Genre, y = test.accuracy)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#dev.off()
+```
+
+
+### best accuracy model for each genre
+```{r}
+# find model with highest accuracy for each genre
+max_accuracy = as.data.frame(as.data.table(model_performance)[, .SD[which.max(train.accuracy)], by=Genre])
+```
+
+```{r}
+#Confusion Matrix
+confusion_matrix_max_accuracy_test <- data.frame(prediction_1 = c(sum(max_accuracy$Test_TruePos),
+                                                                  sum(max_accuracy$Test_FalsePos)),
+                                          prediction_0 = c(sum(max_accuracy$Test_FalseNeg),
+                                                           sum(max_accuracy$Test_TrueNeg)),
+                                          row.names = c('true_1', 'true_0')) 
+# write to file
+write.table(confusion_matrix_max_accuracy_test, file = "confusion_matrix_max_accuracy_test.csv", sep = ",", 
+            col.names = NA, qmethod = "double")
+
+# create tabel image for presentation
+#png("confusion_matrix_max_accuracy_test.png", 500, 250, res=160)
+p<-tableGrob(confusion_matrix_max_accuracy_test)
+grid.arrange(p)
+#dev.off()
+```
+
+```{r}
+#hamming loss
+hamming_loss_test_accuracy_model <- (sum(max_accuracy$Test_FalsePos) + sum(max_accuracy$Test_FalseNeg))/
+  (sum(max_accuracy$Test_TruePos) + sum(max_accuracy$Test_FalseNeg) + sum(max_accuracy$Test_TrueNeg) +
+     sum(max_accuracy$Test_FalsePos))
+
+#f score
+fscore_test_accuracy_model <- 2 * sum(max_accuracy$Test_TruePos) /
+  (2* sum(max_accuracy$Test_TruePos) + sum(max_accuracy$Test_FalsePos) + sum(max_accuracy$Test_FalseNeg))
+
+# sensitivity
+sensitivity_test_accuracy_model <- sum(max_accuracy$Test_TruePos)/(sum(max_accuracy$Test_TruePos) +
+                                                                 sum(max_accuracy$Test_FalseNeg))
+
+# specificity
+specificity_test_accuracy_model <- sum(max_accuracy$Test_TrueNeg)/(sum(max_accuracy$Test_FalsePos) +
+                                                                 sum(max_accuracy$Test_TrueNeg))
+```
+
+```{r}
+write.table(max_accuracy, file='assembled_model_max_accuracy.tsv', quote=FALSE, sep='\t', col.names = T, row.names=FALSE)
+model_performance_assembled_accuracy <- data.frame(hamming_loss_test_accuracy_model,
+                                                   fscore_test_accuracy_model,
+                                                   sensitivity_test_accuracy_model,
+                                                   specificity_test_accuracy_model)
+write.table(model_performance_assembled_accuracy, file='model_performance_assembled_accuracy.tsv', 
+            quote=FALSE, sep='\t', col.names = T, row.names=FALSE)
+```
+
+
+```{r}
+#plot fscore for each selected model
+#png("fscore_each_gennre_accuracy_model.png", 1200, 800, res=160)
+ggplot(data = max_accuracy, aes(x = Genre, y = test.fscore)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#dev.off()
+```
+
+```{r}
+#plot accuracy for each selected model
+#png("accuracy_each_gennre_accuracy_model.png", 1200, 800, res=160)
+ggplot(data = max_accuracy, aes(x = Genre, y = test.accuracy)) +
+  geom_bar(stat="identity") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+#dev.off()
+```
+
