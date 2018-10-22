@@ -1,0 +1,130 @@
+---
+title: "Box and Whisker PLots"
+output: html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library('cluster')
+library('factoextra')
+library('mclust')
+library('corrplot')
+library('dbscan')
+library('MASS')
+library('ggplot2')
+library('ggfortify')
+library('NbClust')
+library('e1071')
+library('tidyr')
+library(scales)
+```
+
+```{r}
+setwd(dir = "~/COMPSCI-109b_Advanced_Topics_in_Datascience/Final_Project/Sandbox/cs109b/")
+tmdb <- read.table('data/tmdb.tsv', 
+                   header=T, sep='\t', 
+                   encoding = 'utf-8', 
+                   quote=NULL, comment='')
+# isolate data
+tmdb$release_month <- as.factor(substr(tmdb$release_date, 6, 7))
+tmdb_release_month <- data.frame(release_month = tmdb[,32], tmdb[,12:31])
+colnames(tmdb_release_month) <- sub('genre_', '', colnames(tmdb_release_month))
+
+tmdb_budget <- data.frame(budget = tmdb[,5], tmdb[,12:31])
+colnames(tmdb_budget) <- sub('genre_', '', colnames(tmdb_budget))
+
+tmdb_original_language  <- data.frame(original_language = tmdb[,6], tmdb[,12:31])
+colnames(tmdb_original_language) <- sub('genre_', '', colnames(tmdb_original_language))
+
+cols = c("Action", "Adventure", "Animation", "Comedy", "Crime", "Documentary", "Drama", "Family", "Fantasy", "Foreign", "History", "Horror", "Music", "Mystery", "Romance", "Science_Fiction", "TV_Movie", "Thriller", "War", "Western")
+
+tmdb_budget[cols] <- lapply(tmdb_budget[cols], factor)
+
+tmdb_original_language[cols] <- lapply(tmdb_original_language[cols], factor)
+
+tmdb_release_month[cols] <- lapply(tmdb_release_month[cols], factor)
+
+tmdb$release_year <- as.integer(substr(tmdb$release_date, 1, 4))
+tmdb$release_year_4 <- (tmdb$release_year-1) %% 4 + 1
+tmdb$release_year_term <- as.factor(tmdb$release_year - 
+                                      tmdb$release_year_4 + 1)
+tmdb$release_year_4 <- as.factor(tmdb$release_year_4)
+
+#tmdb$release_year_4 <- as.factor(substr(tmdb$release_date, 6, 7))
+tmdb_release_year_4 <- data.frame(release_year_4 = tmdb[,34], tmdb[,12:31])
+colnames(tmdb_release_year_4) <- sub('genre_', '', colnames(tmdb_release_year_4))
+tmdb_release_year_4[cols] <- lapply(tmdb_release_year_4[cols], factor)
+
+#tmdb$release_term <- as.factor(substr(tmdb$release_date, 6, 7))
+tmdb_release_term <- data.frame(release_term = tmdb[,35], tmdb[,12:31])
+colnames(tmdb_release_term) <- sub('genre_', '', colnames(tmdb_release_term))
+tmdb_release_term[cols] <- lapply(tmdb_release_term[cols], factor)
+
+#tmdb$release_month <- as.factor(substr(tmdb$release_date, 6, 7))
+```
+
+```{r}
+tmdb1 = ""
+#tmdb1 <- tmdb_release_month
+#tmdb1 <- tmdb_release_year_4
+tmdb1 <- tmdb_release_term
+#tmdb1 <- tmdb_original_language
+tmdb1 <- gather_(tmdb1,
+               value = "value",
+               key = "genre",
+               gather_cols = cols)
+```
+
+
+
+```{r}
+#ggplot(aes(y = log(budget), x = genre, fill = value), data = tmdb1) + geom_boxplot() + 
+#theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
+ggplot(aes(y = original_language, x = genre, fill = value), data = tmdb1) + geom_bar(stat = "identity") + 
+theme(axis.text.x = element_text(angle = 45, hjust = 1)) 
++  scale_y_continuous(labels = percent_format())
+```
+
+```{r}
+tmdb1[, 'value'] <- as.factor(tmdb1[, 'value'])
+levels(tmdb1$value) <- c("out-of-genre", "in-genre")
+png(filename="./Original_Language_by_Genre_Stacked_Barchart.png")
+ggplot(aes(y = value, x = genre, fill = original_language), data = tmdb1) + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1))   + facet_wrap(~ value, ncol = 1) + labs(title = "Stacked Barchart - Month of Release by Genre") + labs(title = "Original Language by Genre - Stacked Barchart")
+#+ facet_grid(~ value, scales="free_y", space = "free_y") + labs(title = "Stacked Barchart - Original Language by Genre")
+dev.off()
+```
+
+
+```{r}
+
+tmdb1[, 'value'] <- as.factor(tmdb1[, 'value'])
+levels(tmdb1$value) <- c("out-of-genre", "in-genre")
+png(filename="./Month_of_Release_by_Genre_Stacked_Barchart.png")
+ggplot(aes(y = value, x = genre, fill = release_month), data = tmdb1) + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1))  + facet_wrap(~ value, ncol = 1) + labs(title = "Month of Release by Genre - Stacked Barchart")
+#+ facet_grid(~ value, scales="free_y", space = "free_y") + labs(title = "Stacked Barchart - Month of Release by Genre") #+ facet_wrap(ncol = 1)
+dev.off()
+```
+
+
+```{r}
+
+tmdb1[, 'value'] <- as.factor(tmdb1[, 'value'])
+levels(tmdb1$value) <- c("out-of-genre", "in-genre")
+png(filename="./Release_Year_4_by_Genre_Stacked_Barchart.png")
+ggplot(aes(y = value, x = genre, fill = release_year_4), data = tmdb1) + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1))  + facet_wrap(~ value, ncol = 1) + labs(title = "Release Year 4 by Genre - Stacked Barchart")
+#+ facet_grid(~ value, scales="free_y", space = "free_y") + labs(title = "Stacked Barchart - Month of Release by Genre") #+ facet_wrap(ncol = 1)
+dev.off()
+```
+
+```{r}
+
+tmdb1[, 'value'] <- as.factor(tmdb1[, 'value'])
+levels(tmdb1$value) <- c("out-of-genre", "in-genre")
+png(filename="./Release_Presidential_Term_by_Genre_Stacked_Barchart.png")
+ggplot(aes(y = value, x = genre, fill = release_term), data = tmdb1) + geom_bar(stat = "identity") + theme(axis.text.x = element_text(angle = 45, hjust = 1))  + facet_wrap(~ value, ncol = 1) + labs(title = "Release Presidential Term by Genre - Stacked Barchart")
+#+ facet_grid(~ value, scales="free_y", space = "free_y") + labs(title = "Stacked Barchart - Month of Release by Genre") #+ facet_wrap(ncol = 1)
+dev.off()
+```

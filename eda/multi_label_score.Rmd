@@ -1,0 +1,24 @@
+---
+title: "Untitled"
+author: "Liangliang Zhang"
+date: "April 16, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(mldr)
+```
+
+```{r}
+multi_label_score <- function(y_true, y_pred)
+{
+  mymldr <- mldr_from_dataframe(y_true, labelIndices = c(1:dim(y_true)[2]), name = "testMLDR")
+  res <- mldr_evaluate(mymldr, y_pred)
+  str(res)
+}
+```
+

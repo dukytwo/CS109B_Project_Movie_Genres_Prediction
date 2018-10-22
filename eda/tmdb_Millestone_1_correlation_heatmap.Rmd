@@ -1,0 +1,39 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)```
+
+```{r}
+# load library
+library(GGally)
+library(cluster)
+library(ggplot2)
+```
+
+```{r}
+# read data
+tmdb <- read.delim('tmdb.tsv')
+tmdb_genre <- tmdb[, 12:ncol(tmdb)]
+colnames(tmdb_genre) <- sub('genre_', '', colnames(tmdb_genre))
+```
+
+```{r}
+# plot correlation heatmap
+library(GGally)
+ggcorr(tmdb_genre, method = c("pairwise", "pearson"),
+       layout.exp  = 1, hjust = 0.8, size = 3,
+       legend.size = 6) + 
+  ggtitle('Correlation heat map for movie genre') + 
+  theme(plot.title = element_text(size = 12, hjust = 0.5))
+```
+
+```{r}
+# apply hierarchical clustering to reorder the genres
+# so we can get clear view of how genres clustered together
+tmdb_cor <- cor(tmdb_genre)
+tmdb_genre.agnes = agnes(tmdb_cor, stand=T)
+ggcorr(tmdb_genre[,tmdb_genre.agnes$order.lab],
+       method = c("pairwise", "pearson"),
+       layout.exp  = 1, hjust = 0.8, size = 3,
+       legend.size = 6) + 
+  ggtitle('Correlation heat map for movie genre') + 
+  theme(plot.title = element_text(size = 12, hjust = 0.5)) 
+```

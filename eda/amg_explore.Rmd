@@ -1,0 +1,197 @@
+---
+title: "Early Exploration"
+author: "Andrew Greene, Doc Cloud Analytics Team"
+date: "March 30, 2017"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library('cluster')
+library('factoextra')
+library('mclust')
+library('corrplot')
+library('dbscan')
+library('MASS')
+library('ggplot2')
+library('ggfortify')
+library('NbClust')
+library('e1071')
+library('tidyr')
+library('randomForest') # NB: masks ggplot2::margin
+```
+
+```{r}
+tmdb <- read.table('data/tmdb.tsv', header=T, sep='\t', encoding = 'utf-8', quote=NULL, comment='')
+tmdb$runtime <- as.integer(as.character(tmdb$runtime))
+director <- read.table('data/director.tsv', header=T, sep='\t', encoding='utf-8', quote=NULL, comment='')
+tmdb <- merge(tmdb, director, by.x='tmdb_id', by.y="Movie_ID")
+cast_affinity <- read.table('data/movie-cast-scores.tsv', header=T, sep='\t', encoding='utf-8', quote=NULL, comment='')
+tmdb <- merge(tmdb, cast_affinity, by='tmdb_id')
+```
+Split up release date into 3 factors....
+
+```{r}
+tmdb$release_year <- as.integer(substr(tmdb$release_date, 1, 4))
+tmdb$release_year_4 <- (tmdb$release_year-1) %% 4 + 1
+tmdb$release_year_term <- as.factor(tmdb$release_year - tmdb$release_year_4 + 1)
+tmdb$release_year_4 <- as.factor(tmdb$release_year_4)
+tmdb$release_month <- as.factor(substr(tmdb$release_date, 6, 7))
+```
+
+TODO: reduce language to the top 5, and encapsulate train v. test
+
+Load the test set, too
+
+```{r}
+tmdb.test <- read.table('data/tmdb-test.tsv', header=T, sep='\t', encoding = 'utf-8', quote=NULL, comment='')
+tmdb.test$runtime <- as.integer(as.character(tmdb.test$runtime))
+director.test <- read.table('data/director-test.tsv', header=T, sep='\t', encoding='utf-8', quote=NULL, comment='')
+tmdb.test <- merge(tmdb.test, director.test, by.x='tmdb_id', by.y="Movie_ID")
+cast_affinity.test <- read.table('data/movie-cast-scores-test.tsv', header=T, sep='\t', encoding='utf-8', quote=NULL, comment='')
+tmdb.test <- merge(tmdb.test, cast_affinity.test, by='tmdb_id')
+tmdb.test$release_year <- as.integer(substr(tmdb.test$release_date, 1, 4))
+tmdb.test$release_year_4 <- (tmdb.test$release_year-1) %% 4 + 1
+tmdb.test$release_year_term <- as.factor(tmdb.test$release_year - tmdb.test$release_year_4 + 1)
+tmdb.test$release_year_4 <- as.factor(tmdb.test$release_year_4)
+tmdb.test$release_month <- as.factor(substr(tmdb.test$release_date, 6, 7))
+tmdb.test$revenue <- as.integer(tmdb.test$revenue)
+```
+
+```{r}
+model.Action <- glm(genre_Action ~ budget + score_genre_Action + popularity, data=tmdb,
+                    family = binomial(link="logit"))
+table(prediction=(predict(model.Action, newdata=tmdb, type='response') > .5), 
+      ground.truth=tmdb$genre_Action)
+```
+
+```{r}
+table(prediction=(predict(model.Action, newdata=tmdb.test, type='response') > .5),
+      ground.truth=tmdb.test$genre_Action)
+```
+
+```{r}
+model.Science_Fiction <- glm(genre_Science_Fiction ~ budget + original_language + popularity, data=tmdb,
+                    family = binomial(link="logit"))
+table(prediction=(predict(model.Science_Fiction, newdata=tmdb, type='response') > .5), ground.truth=tmdb$genre_Science_Fiction)
+```
+
+
+```{r}
+genre_commons <- read.table('data/tmdb-genres.tsv', 
+                            header=T, sep='\t', strip.white=T,
+                            comment.char='')
+genre_pairs <- genre_commons[genre_commons$Genre_2 != '' & !is.na(genre_commons$Genre_2),]
+genre_pairs$distance <- 1/genre_pairs$Num_Movies
+genre_dist <- rbind(genre_pairs, 
+              data.frame(
+                Genre_1 = genre_pairs$Genre_2,
+                Genre_2 = genre_pairs$Genre_1,
+                Num_Movies = genre_pairs$Num_Movies,
+                distance = genre_pairs$distance
+              ),
+              data.frame(
+                Genre_1 = unique(genre_pairs$Genre_1),
+                Genre_2 = unique(genre_pairs$Genre_1),
+                Num_Movies = 1, # doesn't matter
+                distance = 0
+              ))
+genre_matrix <- matrix(genre_dist$distance[
+  order(c(genre_dist$Genre_1, genre_dist$Genre2))], 
+                       nrow=length(levels(genre_dist$Genre_1)),
+                       ncol=length(levels(genre_dist$Genre_1))
+  )
+genre_md <- data.frame(cmdscale(genre_matrix))
+rownames(genre_md) <- levels(genre_dist$Genre_1)
+colnames(genre_md) <- c('x', 'y')
+genre_md$t <- rownames(genre_md)
+ggplot(genre_md, aes(x=x, y=y, label=t)) + geom_text()
+```
+
+
+See how those help with predicting
+```{r}
+model.Action <- glm(genre_Action ~ 
+                      release_year_term + release_year_4 + release_month +
+                      budget + original_language + popularity +
+                      runtime + 
+                      poly(revenue, degree=3) +
+                      poly(score_genre_Action, degree=3)
+                    , data=tmdb[tmdb$release_month != '',],
+                    family = binomial(link="logit"))
+table(prediction=(predict(model.Action, type='response') > .5),
+      ground.truth=tmdb$genre_Action[tmdb$release_month != ''  & !is.na(tmdb$runtime)])
+```
+```{r}
+summary(model.Action)
+```
+
+
+```{r}
+forest.Action <- randomForest(y=as.factor(tmdb$genre_Action),
+                              x=tmdb[,c('release_year_term',
+                                        'release_year_4',
+                                        'release_month',
+                                        'budget',
+                                        # original_language +
+                                        'popularity',
+                                        #'runtime',
+                                        #'revenue',
+                                        'score_genre_Action')],
+                              xtest=tmdb.test[,c('release_year_term',
+                                        'release_year_4',
+                                        'release_month',
+                                        'budget',
+                                        # original_language +
+                                        'popularity',
+                                        #'runtime',
+                                        #'revenue',
+                                        'score_genre_Action')
+                                              ],
+                              ytest=as.factor(tmdb.test$genre_Action),
+                              na.action = na.omit
+                      )
+table(prediction=predict(forest.Action), ground.truth=tmdb$genre_Action[apply(is.na(tmdb), 1, sum) == 0])
+```
+
+```{r}
+levels(tmdb.test$release_year_term) %in% levels(tmdb$release_year_term)
+# apply(is.na(tmdb.test), 2, sum)
+```
+```{r}
+sum(is.na(tmdb.test[!is.na(tmdb.test$runtime) & !is.na(tmdb.test$revenue),]))
+```
+
+```{r}
+table(prediction=predict(forest.Action, 
+                         newdata=tmdb.test), 
+      ground.truth=tmdb.test$genre_Action[apply(is.na(tmdb.test), 1, sum) == 0])
+```
+
+```{r}
+aggregate(tmdb$genre_Action, by=list(tmdb$release_month), mean)
+```
+
+```{r}
+aggregate(tmdb$genre_Western, by=list(tmdb$release_year_4), mean)
+```
+
+```{r}
+aggregate(tmdb$genre_Romance, by=list(tmdb$release_month), mean)
+```
+
+See how those help with predicting
+```{r}
+model.Romance <- glm(genre_Romance ~ 
+                      release_year_term + release_year_4 + release_month +
+                      budget + original_language + popularity +
+                      runtime + 
+                      poly(revenue, degree=3)
+                    , data=tmdb[tmdb$release_month != '',],
+                    family = binomial(link="logit"))
+table(prediction=(predict(model.Romance, type='response') > .5),
+      ground.truth=tmdb$genre_Romance[tmdb$release_month != ''  & !is.na(tmdb$runtime)])
+```
