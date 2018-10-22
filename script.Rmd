@@ -1,0 +1,108 @@
+---
+title: "Milestone 5 - Script"
+author: "The team"
+date: "4/29/2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+[Open on picture of team in M-D lobby]
+
+AG (movie voice): In a world ruled by Big Data, can four Harvard students predict movie genres?
+
+SS: Let's download posters from TMDB, along with ground truth labels for the genres
+
+LZ: They also have metadata like budget, cast, and release dates.
+
+VG: We can integrate IMDB data
+
+AG: Let's derive "affinity" features to reflect that certain directors and actors specialize in certain genres.
+
+SS: We can convert to HSV and find the most frequent hue in the poster.
+
+LZ: How can we use the movie summaries?
+
+VG: We'll use a bag-of-words, but we should specify the genre labels as stopwords!
+
+AG: It's hard to build a single multi-label model, since our classes are so imbalanced
+
+SS: So let's build a separate binary classifier for each genre, and combine the best model for each genre in a multi-label ensemble
+
+VG: How do we want to assess our model's performance?
+
+LZ: We should use Hamming score. it's an appropriate measure of multi-label accuracy.
+
+AG: We can also use the Macro-F1 score, since the classes are imbalanced.
+
+VG: The Random Forest does much better than the "stratified" dummy model we chose as a baseline
+
+LZ: It's neck-and-neck with the SVC
+
+SS: It comes down to fine-tuning the model parameters.
+
+VG: We should try CNNs next
+
+AG: Let's start with an initial model based on VGG16, add two fully-connected layers, and choose middle-of-the-road values for the hyperparameters.
+
+VG: Since our goal is to maximize our F-Score, let's write a custom Keras loss function
+
+LZ: Looks like that does OK, but not great.
+
+VG: The F-Score for this model is better than our dummy model, and almost as good as our Random Forest and SVC
+
+SS: And it's just using 48x48 thumbnails of the posters -- no metadata!
+
+AG: But it doesn't really improve after the first epoch. The training score goes up but the test score doesn't.
+
+VG: It's overfitting!
+
+SS: We should vary the regularization
+
+[Slide]
+
+AG: We should decrease the learning rate when the score plateaus
+
+[Slide]
+
+LZ: We should try smaller batch sizes.
+
+[Slide]
+
+VG: We should resize our FC layers
+
+[Slide]
+
+AG: What other models can we try?
+
+LZ: We can build a CNN from scratch.
+
+[Slide]
+
+VG: The pre-trained one has an advantage, and it shows!
+
+SS: Since the high-level features on a movie poster are different from the ImageNet corpus, retraining the top VGG layers could help.
+
+[Slide]
+
+LZ: That does seem to help a bit
+
+AG: I wish we had time to build a merged model to incorporate the metadata *and* the CNN on the posters.
+
+SS: Or to try larger images, and use augmentation to simulate more images for the rare genres.
+
+LZ: Or to artificially rebalance the cohorts
+
+VG: Well, we have to leave *something* for the sequel!
+
+* All laugh, fade out *
+
+
+
+
+
+
+
+
+
+

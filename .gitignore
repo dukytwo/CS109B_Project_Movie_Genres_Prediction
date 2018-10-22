@@ -1,0 +1,12 @@
+venv
+*.pyc
+*~
+\#*
+apikey.txt
+tmdb-details*
+tmdb-credits*
+*.pdf
+data/images
+.Rdata
+.Rhistory
+*.npy
